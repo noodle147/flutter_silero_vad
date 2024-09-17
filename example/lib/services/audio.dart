@@ -20,7 +20,8 @@ class AudioService {
 
   Future<void> play() async {
     final outputPath =
-        '${(await getApplicationDocumentsDirectory()).path}/output.wav';
+        '${(await getApplicationDocumentsDirectory()).path}/cosy_tts_demo.wav';
+    print('outputPath $outputPath');
     await player.play(DeviceFileSource(outputPath));
   }
 }
