@@ -55,20 +55,28 @@ class RecorderService {
         avAudioSessionRouteSharingPolicy:
             AVAudioSessionRouteSharingPolicy.defaultPolicy,
         avAudioSessionSetActiveOptions: AVAudioSessionSetActiveOptions.none,
-        androidAudioAttributes: const AndroidAudioAttributes(
-          contentType: AndroidAudioContentType.speech,
-          usage: AndroidAudioUsage.voiceCommunication,
-        ),
-        androidWillPauseWhenDucked: true,
+        // androidAudioAttributes: const AndroidAudioAttributes(
+        //   contentType: AndroidAudioContentType.speech,
+        //   usage: AndroidAudioUsage.voiceCommunication,
+        // ),
+        // androidWillPauseWhenDucked: true,
       ),
     );
+    final cacheDir = await getApplicationCacheDirectory();
+    _savedPath =  '${cacheDir.path}/temp.pcm';
     isInited = true;
+    print('isInited $isInited');
   }
 
+  String _savedPath = '';
+  bool _firstSave = true;
+
   Future<void> record(StreamController<List<int>> controller) async {
+    print('record $isInited');
     assert(isInited);
 
-    await recorder.startRecording();
+    _firstSave = true;
+
     await onnxModelToLocal();
     await vad.initialize(
       modelPath: await modelPath,
@@ -78,7 +86,17 @@ class RecorderService {
       minSilenceDurationMs: 100,
       speechPadMs: 0,
     );
+    await recorder.startRecording(0);
+    print('record startRecording');
     recordingDataSubscription = recorder.audioStream.listen((buffer) async {
+      print('buffer ${buffer.length}');
+      if(_firstSave) {
+        _firstSave = false;
+        File(_savedPath).writeAsBytes(buffer);
+      } else {
+        File(_savedPath).writeAsBytes(buffer, mode: FileMode.append);
+      }
+
       final data = _transformBuffer(buffer);
       if (data.isEmpty) return;
       frameBuffer.addAll(buffer);
@@ -100,6 +118,7 @@ class RecorderService {
   }
 
   Future<void> stopRecorder() async {
+    print('stop record');
     await recorder.startRecording();
     if (recordingDataSubscription != null) {
       await recordingDataSubscription?.cancel();
@@ -138,6 +157,7 @@ class RecorderService {
     final transformedBufferFloat =
         transformedBuffer.map((e) => e / 32768).toList();
 
+    print('_handleProcessedAudio ${buffer.length} ${transformedBufferFloat.length}');
     final isActivated =
         await vad.predict(Float32List.fromList(transformedBufferFloat));
     print(isActivated);
@@ -225,6 +245,8 @@ class RecorderService {
     final data = await rootBundle.load('assets/silero_vad.v5.onnx');
     final bytes =
         data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
-    File(await modelPath).writeAsBytesSync(bytes);
+    final path = await modelPath;
+    print('onnxModelToLocal $path');
+    File(path).writeAsBytesSync(bytes);
   }
 }

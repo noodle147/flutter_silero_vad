@@ -14,6 +14,7 @@ class HomePage extends HookConsumerWidget {
     final controller = useStreamController<List<int>>();
     final spots = useState<List<int>>([]);
     useOnAppLifecycleStateChange((beforeState, currState) {
+      print('AppLifecycleState $beforeState -> $currState');
       if (currState == AppLifecycleState.resumed) {
         ref.read(recoderProvider).record(controller);
       } else if (currState == AppLifecycleState.paused) {
