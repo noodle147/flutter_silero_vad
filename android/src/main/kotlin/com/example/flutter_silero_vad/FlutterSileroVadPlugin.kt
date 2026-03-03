@@ -11,7 +11,6 @@ import io.flutter.plugin.common.MethodChannel.Result
 class FlutterSileroVadPlugin : FlutterPlugin, MethodCallHandler {
     private lateinit var channel: MethodChannel
     private lateinit var vad: VadIterator
-
     override fun onAttachedToEngine(@NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "flutter_silero_vad")
         channel.setMethodCallHandler(this)
@@ -20,7 +19,7 @@ class FlutterSileroVadPlugin : FlutterPlugin, MethodCallHandler {
     override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: Result) {
         when (call.method) {
             "initialize" -> {
-                vad = VadIteratorV5(
+                vad = VadIteratorV6(
                     call.argument<String>("modelPath")!!,
                     call.argument<Long>("sampleRate")!!,
                     call.argument<Long>("frameSize")!!,
@@ -40,6 +39,11 @@ class FlutterSileroVadPlugin : FlutterPlugin, MethodCallHandler {
             "resetState" -> {
                 vad.resetState()
                 result.success("vad reset state")
+            }
+
+            "release" -> {
+                vad.release()
+                result.success("vad released")
             }
 
             else -> {

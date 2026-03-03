@@ -102,4 +102,8 @@ class VadIteratorV5 constructor(
         }
         return triggerd;
     }
+
+    override fun release() {
+        session.close();
+    }
 }

@@ -11,10 +11,10 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class RecorderService {
-  final recorder = AudioStreamer.instance;
+  final recorder = AudioStreamer();
   final vad = FlutterSileroVad();
   Future<String> get modelPath async =>
-      '${(await getApplicationSupportDirectory()).path}/silero_vad.v5.onnx';
+      '${(await getApplicationSupportDirectory()).path}/silero_vad.v6.onnx';
   final sampleRate = 16000;
   final frameSize = 40; // 80ms
 
@@ -33,7 +33,7 @@ class RecorderService {
   DateTime? lastActiveTime;
   final processedAudioStreamController =
       StreamController<List<int>>.broadcast();
-  StreamSubscription<List<int>>? recordingDataSubscription;
+  StreamSubscription<List<double>>? recordingDataSubscription;
   StreamSubscription<List<int>>? processedAudioSubscription;
 
   final frameBuffer = <int>[];
@@ -65,7 +65,7 @@ class RecorderService {
     final cacheDir = await getApplicationCacheDirectory();
     _savedPath =  '${cacheDir.path}/temp.pcm';
     isInited = true;
-    print('isInited $isInited');
+    print('isInited $isInited $_savedPath');
   }
 
   String _savedPath = '';
@@ -86,20 +86,27 @@ class RecorderService {
       minSilenceDurationMs: 100,
       speechPadMs: 0,
     );
-    await recorder.startRecording(0);
+
     print('record startRecording');
+    recorder.sampleRate = sampleRate;
     recordingDataSubscription = recorder.audioStream.listen((buffer) async {
-      print('buffer ${buffer.length}');
+      print('buffer ${buffer.length} ${await recorder.actualSampleRate}');
+
+      final intList = buffer.map((t) => min(32767, max(-32767, t * 32768)).toInt()).toList();
+      final data = Int16List.fromList(intList);
+      final uint8List = data.buffer.asUint8List();
+
       if(_firstSave) {
         _firstSave = false;
-        File(_savedPath).writeAsBytes(buffer);
+        File(_savedPath).writeAsBytes(uint8List);
       } else {
-        File(_savedPath).writeAsBytes(buffer, mode: FileMode.append);
+        File(_savedPath).writeAsBytes(uint8List, mode: FileMode.append);
       }
 
-      final data = _transformBuffer(buffer);
+      // final data = _transformBuffer(intList);
+      
       if (data.isEmpty) return;
-      frameBuffer.addAll(buffer);
+      frameBuffer.addAll(intList);
       while (frameBuffer.length >= frameSize * 2 * sampleRate ~/ 1000) {
         final b = frameBuffer.take(frameSize * 2 * sampleRate ~/ 1000).toList();
         frameBuffer.removeRange(0, frameSize * 2 * sampleRate ~/ 1000);
@@ -119,7 +126,6 @@ class RecorderService {
 
   Future<void> stopRecorder() async {
     print('stop record');
-    await recorder.startRecording();
     if (recordingDataSubscription != null) {
       await recordingDataSubscription?.cancel();
       recordingDataSubscription = null;
@@ -153,14 +159,14 @@ class RecorderService {
   final audioDataBuffer = <int>[];
 
   Future<void> _handleProcessedAudio(List<int> buffer) async {
-    final transformedBuffer = _transformBuffer(buffer);
+    final transformedBuffer = Int16List.fromList(buffer);
     final transformedBufferFloat =
         transformedBuffer.map((e) => e / 32768).toList();
 
     print('_handleProcessedAudio ${buffer.length} ${transformedBufferFloat.length}');
     final isActivated =
         await vad.predict(Float32List.fromList(transformedBufferFloat));
-    print(isActivated);
+    print('isActivated $isActivated');
     if (isActivated == true) {
       lastActiveTime = DateTime.now();
       audioDataBuffer.addAll(lastAudioData);
@@ -242,7 +248,7 @@ class RecorderService {
 
   /// アセットからアプリケーションディレクトリにファイルをコピーする
   Future<void> onnxModelToLocal() async {
-    final data = await rootBundle.load('assets/silero_vad.v5.onnx');
+    final data = await rootBundle.load('assets/silero_vad.v6.onnx');
     final bytes =
         data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
     final path = await modelPath;
