@@ -46,7 +46,7 @@ android {
     }
 
     dependencies {
-        implementation 'com.microsoft.onnxruntime:onnxruntime-android:1.13.1'
+        implementation 'com.microsoft.onnxruntime:onnxruntime-android:1.24.2'
         // Dependencies below are required only for development in the IDE.
     //    implementation 'androidx.annotation:annotation:1.8.0'
     //    implementation 'androidx.annotation:annotation-experimental:1.4.1'
